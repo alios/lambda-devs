@@ -34,12 +34,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE FlexibleInstances #-}
 
 module Data.DEVS.Simulation.Types
-    ( SimPorts
-    , ProcessorConstructor
-    , ProcessorModel (..)
+    ( ProcessorModel (..)
     , Processor (..)
+    , ProcessorConstructor
     , SimulatorMsg (..)
     , TransportMsg (..)
+    , SimPorts
     ) where
 
 
@@ -49,20 +49,8 @@ import Data.Binary
 import Control.Distributed.Process
 import Data.DEVS.Devs
 
-
--- | a touple 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
-type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
-
 -- | a 'Model' which is suitable to be used in a 'Processor'
 class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => ProcessorModel m
-
--- | type of a processor constructor. see 'mkProcessor'
-type ProcessorConstructor p m = 
-    Maybe (ProcessorConfig p m) -- ^ Optional 'ProcessorConfig'
-    -> SimPorts m -- ^ 'SimPorts' for processor output
-    -> m -- ^ the model run by the processor
-    -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
-
 
 -- | a processor runs a model during simulation
 class (ProcessorModel m, Binary T) => Processor p m where
@@ -89,7 +77,14 @@ class (ProcessorModel m, Binary T) => Processor p m where
       (cs_trans_self, cr_trans_self) <- newChan
       return ((cs_sim_self, cs_trans_self), (cr_sim_self, cr_trans_self))
 
-              
+
+-- | type of a processor constructor. see 'mkProcessor'
+type ProcessorConstructor p m = 
+    Maybe (ProcessorConfig p m) -- ^ Optional 'ProcessorConfig'
+    -> SimPorts m -- ^ 'SimPorts' for processor output
+    -> m -- ^ the model run by the processor
+    -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
+        
 -- | messages used by processors for syncronization
 data SimulatorMsg 
     = MsgStar T
@@ -102,6 +97,9 @@ data TransportMsg m
     = MsgY T (Y m)
     | MsgQ T (X m)
       deriving (Typeable)
+
+-- | a touple 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
+type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
 
 
 --- 
