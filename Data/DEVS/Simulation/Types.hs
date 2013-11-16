@@ -53,27 +53,36 @@ import Data.DEVS.Devs
 -- | a touple 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
 type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
 
+-- | a 'Model' which is suitable to be used in a 'Processor'
+class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => ProcessorModel m
 
--- | type of a processor constructor 
+-- | type of a processor constructor. see 'mkProcessor'
 type ProcessorConstructor p m = 
     Maybe (ProcessorConfig p m) -- ^ Optional 'ProcessorConfig'
     -> SimPorts m -- ^ 'SimPorts' for processor output
     -> m -- ^ the model run by the processor
     -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
 
-class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => ProcessorModel m
 
 -- | a processor runs a model during simulation
 class (ProcessorModel m, Binary T) => Processor p m where
     data ProcessorState p m :: * 
     data ProcessorConfig p m :: *
-                           
+    
+    -- | returns the processors default configuration
     defaultProcessorConfig :: ProcessorConfig p m
+    
+    -- | the processors initial state 
+    proc_s0 :: p -> ProcessorState p m 
+
+    -- | the processor constructor. see 'ProcessorConstructor' 
+    mkProcessor :: p -> ProcessorConstructor p m 
+
+    -- | if argument 'isJust' return config, else return 'defaultProcessorConfig' 
     readProcessorConfig :: Maybe (ProcessorConfig p m) -> ProcessorConfig p m
     readProcessorConfig = maybe defaultProcessorConfig id 
 
-    mkProcessor :: p -> ProcessorConstructor p m -- ^ a constructor
-    proc_s0 :: p -> ProcessorState p m -- ^ the initial state 
+    -- | creates a touple of 'SimPorts' for 'SimulatorMsg' and 'TransportMsg'
     mkPorts :: p -> Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
     mkPorts p = do
       (cs_sim_self, cr_sim_self) <- newChan
