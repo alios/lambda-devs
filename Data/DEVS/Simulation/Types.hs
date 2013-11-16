@@ -30,9 +30,9 @@ type ProcessorConstructor m =
 
 -- | a processor runs a model during simulation
 class Processor p m where
-    data ProcessorState p m :: * -- | the type of the 'Processor's internal state
-    mkProcessor :: p -> ProcessorConstructor m -- | a constructor
-    proc_s0 :: p -> ProcessorState p m -- | the initial state 
+    data ProcessorState p m :: * -- ^ the type of the 'Processor's internal state
+    mkProcessor :: p -> ProcessorConstructor m -- ^ a constructor
+    proc_s0 :: p -> ProcessorState p m -- ^ the initial state 
 
 -- | messages used by processors for syncronization
 data SimulatorMsg 
