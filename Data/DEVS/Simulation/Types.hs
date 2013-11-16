@@ -12,8 +12,9 @@ module Data.DEVS.Simulation.Types
 
 
 
-import Data.Typeable
-import Data.Data
+import Data.Typeable (Typeable)
+import Data.Data (Data)
+import Data.Binary
 
 import Control.Distributed.Process
 
@@ -43,4 +44,42 @@ type ProcessorConstructor m =
 class Processor p m where
     data ProcessorState p m :: *
     mkProcessor :: p -> ProcessorConstructor m
+    proc_s0 :: p -> m -> ProcessorState p m
+
+
+instance Binary SimulatorMsg where
+    put m = do
+      put (0x01 :: Word8)
+      case m of
+        (MsgStar t) -> do put (0x01 :: Word8) ; put t
+        (MsgAt t)   -> do put (0x02 :: Word8) ; put t
+        (MsgDone t) -> do put (0x03 :: Word8) ; put t
+    get = do
+      b1 <- getWord8
+      b2 <- getWord8
+      t <- get
+      if (b1 == 0x01) 
+      then case b2 of
+             0x01 -> return $ MsgStar t 
+             0x02 -> return $ MsgAt t
+             0x03 -> return $ MsgDone t
+             _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
+      else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
+
+instance (DEVS m) => Binary (TransportMsg m) where
+    put m = do
+      put (0x02 :: Word8)
+      case m of
+        (MsgY t y) -> do put (0x01 :: Word8) ; put t ; put y
+        (MsgQ t x) -> do put (0x02 :: Word8) ; put t ; put x
+    get = do
+      b1 <- getWord8
+      b2 <- getWord8
+      t <- get
+      if (b1 == 0x02) 
+      then case b2 of
+             0x01 -> fmap (MsgY t) get
+             0x02 -> fmap (MsgQ t) get
+             _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
+      else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
 

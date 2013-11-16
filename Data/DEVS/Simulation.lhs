@@ -8,7 +8,6 @@ module Data.DEVS.Simulation
     , mkProcessor
     ) where
 
-import Data.Binary
 import Data.Set (Set)
 import qualified Data.Set as Set
 
@@ -24,35 +23,7 @@ import Data.DEVS.Simulation.Types
 \begin{code}
 
 data Simulator = Sim
-data Coordinator = Coord
 
-instance (CoupledModel m) => Processor Coordinator m where
-    data ProcessorState Coordinator m = 
-        CoordinatorState {
-          cs_TL :: T,
-          cs_TN :: T
-        }
-
-    mkProcessor _ (cs_sim_parent, cs_tran_parent) m = 
-        let localLoop cr_self s = updateCoordState s cr_self >>= localLoop cr_self
-            updateCoordState s (cr_sim_self, cr_trans_self) = 
-                let mMsgAt (MsgAt t) = 
-                        if (t == cs_TN s)
-                        then do
-                          sendChan cs_sim_parent $ MsgDone t
-                          return $ s { cs_TL = t }
-                        else procError "coordinator error: received MsgAt at t != TN"
-                in receiveWait [ matchChan cr_sim_self mMsgAt]
-        in do
-          ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
-          let initState = CoordinatorState {
-                            cs_TL = 0,
-                            cs_TN = 0
-                          }
-          _ <- spawnLocal $ localLoop cr_self initState
-          return (cs_sim_self, cs_trans_self)
-
- 
 instance (DEVS m) => Processor Simulator m where
     data ProcessorState Simulator m = 
         SimulatorState {
@@ -62,8 +33,14 @@ instance (DEVS m) => Processor Simulator m where
           as_bag :: Set (X m)
         }
 
+    proc_s0 p m = 
+        SimulatorState { as_TL = 0
+                       , as_TN = 0 
+                       , as_modelS = s0 m
+                       , as_bag = Set.empty
+                       }
 
-    mkProcessor _ (cs_sim_parent, cs_trans_parent) mod =
+    mkProcessor p (cs_sim_parent, cs_trans_parent) mod =
         let localLoop cr_self s = updateSimState s cr_self >>= localLoop cr_self
             updateSimState s (cr_sim_self, cr_trans_self) =
                 let mMsgAt (MsgAt t) = 
@@ -103,56 +80,41 @@ instance (DEVS m) => Processor Simulator m where
                                , matchChan cr_sim_self mMsgStar
                                ]
         in do
-          let initState = 
-                  SimulatorState { as_TL = 0
-                                 , as_TN = 0
-                                 , as_modelS = s0 mod
-                                 , as_bag = Set.empty
-                                 }
+          let initState = proc_s0 p mod
           ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
           _ <- spawnLocal $ localLoop cr_self initState
           -- TODO store pid in registry ?
           return (cs_sim_self, cs_trans_self)
 
---
--- instances 
---
 
-instance Binary SimulatorMsg where
-    put m = do
-      put (0x01 :: Word8)
-      case m of
-        (MsgStar t) -> do put (0x01 :: Word8) ; put t
-        (MsgAt t)   -> do put (0x02 :: Word8) ; put t
-        (MsgDone t) -> do put (0x03 :: Word8) ; put t
-    get = do
-      b1 <- getWord8
-      b2 <- getWord8
-      t <- get
-      if (b1 == 0x01) 
-      then case b2 of
-             0x01 -> return $ MsgStar t 
-             0x02 -> return $ MsgAt t
-             0x03 -> return $ MsgDone t
-             _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
-      else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
+data Coordinator = Coord
 
-instance (DEVS m) => Binary (TransportMsg m) where
-    put m = do
-      put (0x02 :: Word8)
-      case m of
-        (MsgY t y) -> do put (0x01 :: Word8) ; put t ; put y
-        (MsgQ t x) -> do put (0x02 :: Word8) ; put t ; put x
-    get = do
-      b1 <- getWord8
-      b2 <- getWord8
-      t <- get
-      if (b1 == 0x02) 
-      then case b2 of
-             0x01 -> fmap (MsgY t) get
-             0x02 -> fmap (MsgQ t) get
-             _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
-      else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
+instance (CoupledModel m) => Processor Coordinator m where
+    data ProcessorState Coordinator m = 
+        CoordinatorState {
+          cs_TL :: T,
+          cs_TN :: T
+        }
+    proc_s0 p m = CoordinatorState {
+                  cs_TL = 0,
+                  cs_TN = 0
+                }
+    mkProcessor p (cs_sim_parent, cs_tran_parent) m = 
+        let localLoop cr_self s = updateCoordState s cr_self >>= localLoop cr_self
+            updateCoordState s (cr_sim_self, cr_trans_self) = 
+                let mMsgAt (MsgAt t) = 
+                        if (t == cs_TN s)
+                        then do
+                          sendChan cs_sim_parent $ MsgDone t
+                          return $ s { cs_TL = t }
+                        else procError "coordinator error: received MsgAt at t != TN"
+                in receiveWait [ matchChan cr_sim_self mMsgAt]
+        in do
+          ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
+          let initState = proc_s0 p m
+          _ <- spawnLocal $ localLoop cr_self initState
+          return (cs_sim_self, cs_trans_self)
+
         
 
 --
