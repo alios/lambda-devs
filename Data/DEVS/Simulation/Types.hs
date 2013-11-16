@@ -55,8 +55,9 @@ type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
 
 
 -- | type of a processor constructor 
-type ProcessorConstructor m = 
-    SimPorts m -- ^ 'SimPorts' for processor output
+type ProcessorConstructor p m = 
+    Maybe (ProcessorConfig p m) -- ^ Optional 'ProcessorConfig'
+    -> SimPorts m -- ^ 'SimPorts' for processor output
     -> m -- ^ the model run by the processor
     -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
 
@@ -65,7 +66,13 @@ class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => 
 -- | a processor runs a model during simulation
 class (ProcessorModel m, Binary T) => Processor p m where
     data ProcessorState p m :: * 
-    mkProcessor :: p -> ProcessorConstructor m -- ^ a constructor
+    data ProcessorConfig p m :: *
+                           
+    defaultProcessorConfig :: ProcessorConfig p m
+    readProcessorConfig :: Maybe (ProcessorConfig p m) -> ProcessorConfig p m
+    readProcessorConfig = maybe defaultProcessorConfig id 
+
+    mkProcessor :: p -> ProcessorConstructor p m -- ^ a constructor
     proc_s0 :: p -> ProcessorState p m -- ^ the initial state 
     mkPorts :: p -> Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
     mkPorts p = do

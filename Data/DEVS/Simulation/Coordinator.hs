@@ -59,11 +59,15 @@ instance (ProcessorModel m, CoupledModel m) => Processor (Coordinator m) m where
           cs_TL :: T,
           cs_TN :: T
         }
+    data ProcessorConfig (Coordinator m) m = CoordinatorConfig 
+
+    defaultProcessorConfig = CoordinatorConfig
+
     proc_s0 (Coordinator m) = CoordinatorState {
                   cs_TL = 0 *~ second,
                   cs_TN = 0 *~ second
                 }
-    mkProcessor p (cs_sim_parent, cs_tran_parent) m = 
+    mkProcessor p cfg (cs_sim_parent, cs_tran_parent) m = 
         let localLoop cr_self s = updateCoordState s cr_self >>= localLoop cr_self
             updateCoordState s (cr_sim_self, cr_trans_self) = 
                 let mMsgAt (MsgAt t) = 

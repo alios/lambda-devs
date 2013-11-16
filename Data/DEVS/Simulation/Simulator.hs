@@ -62,6 +62,9 @@ instance (ProcessorModel m, DEVS m) => Processor (Simulator m) m where
           as_bag :: Set (X m)
         }
 
+    data ProcessorConfig (Simulator m) m = SimulatorConfig 
+    defaultProcessorConfig = SimulatorConfig
+
     proc_s0 (Simulator m) = 
         SimulatorState { as_TL = 0 *~ second
                        , as_TN = 0 *~ second
@@ -69,8 +72,9 @@ instance (ProcessorModel m, DEVS m) => Processor (Simulator m) m where
                        , as_bag = Set.empty
                        }
 
-    mkProcessor p (cs_sim_parent, cs_trans_parent) mod =
-        let localLoop cr_self s = updateSimState s cr_self >>= localLoop cr_self
+    mkProcessor p cfg' (cs_sim_parent, cs_trans_parent) mod =
+        let cfg = readProcessorConfig cfg'
+            localLoop cr_self s = updateSimState s cr_self >>= localLoop cr_self
             updateSimState s (cr_sim_self, cr_trans_self) =
                 let mMsgAt (MsgAt t) = 
                         if (t == as_TN s)
