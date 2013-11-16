@@ -37,7 +37,7 @@ class Processor p m where
 -- | messages used by processors for syncronization
 data SimulatorMsg 
     = MsgStar T
-    | MsgAt T
+    | MsgAt T 
     | MsgDone T
       deriving (Typeable, Data)
 

@@ -55,9 +55,12 @@ library
                        Data.DEVS.Devs
                        Data.DEVS.Simulation, 
                        Data.DEVS.Simulation.Types 
+                       Data.DEVS.Simulation.Simulator 
+                       Data.DEVS.Simulation.Coordinator
   
   -- Modules included in this library but not exported.
---  other-modules:              
+  other-modules:       Data.DEVS.Simulation.Helpers
+                      
   
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:    MultiParamTypeClasses,
