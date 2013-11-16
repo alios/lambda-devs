@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 {-
 Copyright (c) 2013, Markus Barenhoff <alios@alios.org>
 All rights reserved.
@@ -32,14 +34,14 @@ module Data.DEVS.Simulation.Helpers
 import Control.Distributed.Process
 import Data.DEVS.Simulation.Types
 import Data.DEVS.Devs
-
+import Data.Binary 
 -- | outputs 'msg' using 'say' and then calls 'fail'
 procError :: String -> Process a
 procError msg = say msg >>= fail msg
 
 -- | create new channels for 'SimulatorMsg' and 'TransportMsg'
 mkSimPorts :: 
-    (DEVS m) => Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
+    (DEVS m, Binary T) => Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
 mkSimPorts = do
       (cs_sim_self, cr_sim_self) <- newChan
       (cs_trans_self, cr_trans_self) <- newChan

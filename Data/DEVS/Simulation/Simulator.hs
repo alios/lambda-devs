@@ -29,16 +29,21 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.DEVS.Simulation.Simulator
     ( Simulator, mkSimulator ) where
 
+import Data.Binary (Binary)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Distributed.Process
 import Data.DEVS.Devs
 import Data.DEVS.Simulation.Types
 import Data.DEVS.Simulation.Helpers
+import qualified Prelude as P
+import Numeric.Units.Dimensional.Prelude
 
 
 -- | the 'Simulator' type. See also 'Processor'
@@ -48,7 +53,7 @@ newtype Simulator m = Simulator m
 mkSimulator :: (DEVS m) => m -> Simulator m
 mkSimulator = Simulator
 
-instance (DEVS m) => Processor (Simulator m) m where
+instance (DEVS m, Binary T) => Processor (Simulator m) m where
     data ProcessorState (Simulator m) m = 
         SimulatorState {
           as_TL :: T,
@@ -58,8 +63,8 @@ instance (DEVS m) => Processor (Simulator m) m where
         }
 
     proc_s0 (Simulator m) = 
-        SimulatorState { as_TL = 0
-                       , as_TN = 0 
+        SimulatorState { as_TL = 0 *~ second
+                       , as_TN = 0 *~ second
                        , as_modelS = s0 m
                        , as_bag = Set.empty
                        }

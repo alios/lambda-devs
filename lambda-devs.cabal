@@ -10,7 +10,7 @@ name:                lambda-devs
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.0.1
+version:             0.1.0
 
 -- A short (one-line) description of the package.
 synopsis:            a Paralell-DEVS implementaion based on distributed-process
@@ -61,19 +61,20 @@ library
   -- Modules included in this library but not exported.
   other-modules:       Data.DEVS.Simulation.Helpers
                       
-  
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:    MultiParamTypeClasses,
                        TypeFamilies, 
                        FlexibleContexts,
                        FlexibleInstances,
+                       UndecidableInstances,
                        DeriveDataTypeable
  
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.6, 
                        binary >=0.5, 
                        containers >=0.5, 
-                       distributed-process >=0.4
+                       distributed-process >=0.4,
+                       dimensional >= 0.12
   
   -- Directories containing source files.
   -- hs-source-dirs:      

@@ -29,6 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.DEVS.Simulation.Types
     ( SimPorts
@@ -67,7 +69,7 @@ data SimulatorMsg
     = MsgStar T
     | MsgAt T 
     | MsgDone T
-      deriving (Typeable, Data)
+      deriving (Typeable)
 
 -- | messages used by processor for event transportation
 data TransportMsg m 
@@ -80,7 +82,7 @@ data TransportMsg m
 --- Instances
 ---
 
-instance Binary SimulatorMsg where
+instance (Binary T) => Binary SimulatorMsg where
     put m = do
       put (0x01 :: Word8)
       case m of
@@ -99,7 +101,7 @@ instance Binary SimulatorMsg where
              _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
       else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
 
-instance (DEVS m) => Binary (TransportMsg m) where
+instance (DEVS m, Binary T) => Binary (TransportMsg m) where
     put m = do
       put (0x02 :: Word8)
       case m of

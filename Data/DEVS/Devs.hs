@@ -28,6 +28,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Data.DEVS.Devs (T, DEVS (..), CoupledModel (..)) where
 
@@ -35,8 +37,12 @@ import Data.Binary
 import Data.Typeable (Typeable)
 import Data.Set (Set)
 
+import qualified Prelude as P
+import Numeric.Units.Dimensional.Prelude
+import Numeric.Units.Dimensional
 
-type T = Double
+type T = Time Double
+
 
 class (Typeable m, Ord (X m), Binary (X m), Binary (Y m)) => DEVS m where
     data S m :: *

@@ -29,16 +29,22 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.DEVS.Simulation.Coordinator
     ( Coordinator, mkCoordinator ) where
 
+import Data.Binary (Binary)
 import Data.Set (Set)
 import qualified Data.Set as Set
 import Control.Distributed.Process
 import Data.DEVS.Devs
 import Data.DEVS.Simulation.Types
 import Data.DEVS.Simulation.Helpers
+
+import qualified Prelude as P
+import Numeric.Units.Dimensional.Prelude
 
 -- | the 'Coordinator' type. See also 'Processor'
 newtype Coordinator m = Coordinator m
@@ -47,15 +53,15 @@ newtype Coordinator m = Coordinator m
 mkCoordinator :: (CoupledModel m) => m -> Coordinator m
 mkCoordinator = Coordinator
 
-instance (CoupledModel m) => Processor (Coordinator m) m where
+instance (CoupledModel m, Binary T) => Processor (Coordinator m) m where
     data ProcessorState (Coordinator m) m = 
         CoordinatorState {
           cs_TL :: T,
           cs_TN :: T
         }
     proc_s0 (Coordinator m) = CoordinatorState {
-                  cs_TL = 0,
-                  cs_TN = 0
+                  cs_TL = 0 *~ second,
+                  cs_TN = 0 *~ second
                 }
     mkProcessor p (cs_sim_parent, cs_tran_parent) m = 
         let localLoop cr_self s = updateCoordState s cr_self >>= localLoop cr_self
