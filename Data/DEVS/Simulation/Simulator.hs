@@ -50,10 +50,10 @@ import Numeric.Units.Dimensional.Prelude
 newtype Simulator m = Simulator m
 
 -- | creates a new 'Simulator' for the given 'DEVS' 
-mkSimulator :: (DEVS m) => m -> Simulator m
+mkSimulator :: (ProcessorModel m, DEVS m) => m -> Simulator m
 mkSimulator = Simulator
 
-instance (DEVS m, Binary T) => Processor (Simulator m) m where
+instance (ProcessorModel m, DEVS m) => Processor (Simulator m) m where
     data ProcessorState (Simulator m) m = 
         SimulatorState {
           as_TL :: T,
@@ -110,7 +110,7 @@ instance (DEVS m, Binary T) => Processor (Simulator m) m where
                                ]
         in do
           let initState = proc_s0 p
-          ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
+          ((cs_sim_self, cs_trans_self), cr_self) <- mkPorts p
           _ <- spawnLocal $ localLoop cr_self initState
           -- TODO store pid in registry ?
           return (cs_sim_self, cs_trans_self)

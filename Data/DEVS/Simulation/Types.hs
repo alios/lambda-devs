@@ -31,10 +31,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Data.DEVS.Simulation.Types
     ( SimPorts
     , ProcessorConstructor
+    , ProcessorModel (..)
     , Processor (..)
     , SimulatorMsg (..)
     , TransportMsg (..)
@@ -48,7 +50,7 @@ import Control.Distributed.Process
 import Data.DEVS.Devs
 
 
--- | a touple of 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
+-- | a touple 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
 type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
 
 
@@ -58,12 +60,20 @@ type ProcessorConstructor m =
     -> m -- ^ the model run by the processor
     -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
 
+class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => ProcessorModel m
+
 -- | a processor runs a model during simulation
-class Processor p m where
+class (ProcessorModel m, Binary T) => Processor p m where
     data ProcessorState p m :: * 
     mkProcessor :: p -> ProcessorConstructor m -- ^ a constructor
     proc_s0 :: p -> ProcessorState p m -- ^ the initial state 
+    mkPorts :: p -> Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
+    mkPorts p = do
+      (cs_sim_self, cr_sim_self) <- newChan
+      (cs_trans_self, cr_trans_self) <- newChan
+      return ((cs_sim_self, cs_trans_self), (cr_sim_self, cr_trans_self))
 
+              
 -- | messages used by processors for syncronization
 data SimulatorMsg 
     = MsgStar T
@@ -101,7 +111,7 @@ instance (Binary T) => Binary SimulatorMsg where
              _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
       else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
 
-instance (DEVS m, Binary T) => Binary (TransportMsg m) where
+instance (ProcessorModel m) => Binary (TransportMsg m) where
     put m = do
       put (0x02 :: Word8)
       case m of

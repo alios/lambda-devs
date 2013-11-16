@@ -50,10 +50,10 @@ import Numeric.Units.Dimensional.Prelude
 newtype Coordinator m = Coordinator m
 
 -- | creates a new 'Coordinator' for the given 'CoupledModel'  
-mkCoordinator :: (CoupledModel m) => m -> Coordinator m
+mkCoordinator :: (ProcessorModel m, CoupledModel m) => m -> Coordinator m
 mkCoordinator = Coordinator
 
-instance (CoupledModel m, Binary T) => Processor (Coordinator m) m where
+instance (ProcessorModel m, CoupledModel m) => Processor (Coordinator m) m where
     data ProcessorState (Coordinator m) m = 
         CoordinatorState {
           cs_TL :: T,
@@ -74,7 +74,7 @@ instance (CoupledModel m, Binary T) => Processor (Coordinator m) m where
                         else procError "coordinator error: received MsgAt at t != TN"
                 in receiveWait [ matchChan cr_sim_self mMsgAt]
         in do
-          ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
+          ((cs_sim_self, cs_trans_self), cr_self) <- mkPorts p
           let initState = proc_s0 p
           _ <- spawnLocal $ localLoop cr_self initState
           return (cs_sim_self, cs_trans_self)

@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -}
 
 module Data.DEVS.Simulation.Helpers
-    (procError, mkSimPorts) where
+    (procError) where
 
 import Control.Distributed.Process
 import Data.DEVS.Simulation.Types
@@ -40,9 +40,5 @@ procError :: String -> Process a
 procError msg = say msg >>= fail msg
 
 -- | create new channels for 'SimulatorMsg' and 'TransportMsg'
-mkSimPorts :: 
-    (DEVS m, Binary T) => Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
-mkSimPorts = do
-      (cs_sim_self, cr_sim_self) <- newChan
-      (cs_trans_self, cr_trans_self) <- newChan
-      return ((cs_sim_self, cs_trans_self), (cr_sim_self, cr_trans_self))
+--mkSimPorts = do
+
