@@ -3,35 +3,22 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Data.DEVS.Simulation.Types
-    ( SimulatorMsg (..)
-    , TransportMsg (..)
-    , SimPorts
+    ( SimPorts
     , ProcessorConstructor
     , Processor (..)
+    , SimulatorMsg (..)
+    , TransportMsg (..)
     ) where
-
 
 
 import Data.Typeable (Typeable)
 import Data.Data (Data)
 import Data.Binary
-
 import Control.Distributed.Process
-
 import Data.DEVS.Devs
 
 
-data SimulatorMsg 
-    = MsgStar T
-    | MsgAt T
-    | MsgDone T
-      deriving (Typeable, Data)
-
-data TransportMsg m 
-    = MsgY T (Y m)
-    | MsgQ T (X m)
-      deriving (Typeable)
-
+-- | a touple of 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
 type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
 
 
@@ -41,11 +28,29 @@ type ProcessorConstructor m =
     -> m -- ^ the model run by the processor
     -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
 
+-- | a processor runs a model during simulation
 class Processor p m where
-    data ProcessorState p m :: *
-    mkProcessor :: p -> ProcessorConstructor m
-    proc_s0 :: p -> m -> ProcessorState p m
+    data ProcessorState p m :: * -- | the type of the 'Processor's internal state
+    mkProcessor :: p -> ProcessorConstructor m -- | a constructor
+    proc_s0 :: p -> ProcessorState p m -- | the initial state 
 
+-- | messages used by processors for syncronization
+data SimulatorMsg 
+    = MsgStar T
+    | MsgAt T
+    | MsgDone T
+      deriving (Typeable, Data)
+
+-- | messages used by processor for event transportation
+data TransportMsg m 
+    = MsgY T (Y m)
+    | MsgQ T (X m)
+      deriving (Typeable)
+
+
+--- 
+--- Instances
+---
 
 instance Binary SimulatorMsg where
     put m = do
@@ -82,4 +87,5 @@ instance (DEVS m) => Binary (TransportMsg m) where
              0x02 -> fmap (MsgQ t) get
              _    -> fail $ "get SimulatorMsg : unknown msg code " ++ show b2
       else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
+
 

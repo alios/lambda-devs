@@ -4,8 +4,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Data.DEVS.Simulation
-    ( Simulator, Coordinator
-    , mkProcessor
+    ( Simulator, mkSimulator
+    , Coordinator, mkCoordinator
     ) where
 
 import Data.Set (Set)
@@ -19,13 +19,19 @@ import Data.DEVS.Simulation.Types
 \end{code}
 
 
+\section{Simulator}
 
 \begin{code}
 
-data Simulator = Sim
+-- | the 'Simulator' type. See also 'Processor'
+newtype Simulator m = Simulator m
 
-instance (DEVS m) => Processor Simulator m where
-    data ProcessorState Simulator m = 
+-- | creates a new 'Simulator' for the given 'DEVS' 
+mkSimulator :: (DEVS m) => m -> Simulator m
+mkSimulator = Simulator
+
+instance (DEVS m) => Processor (Simulator m) m where
+    data ProcessorState (Simulator m) m = 
         SimulatorState {
           as_TL :: T,
           as_TN :: T,
@@ -33,7 +39,7 @@ instance (DEVS m) => Processor Simulator m where
           as_bag :: Set (X m)
         }
 
-    proc_s0 p m = 
+    proc_s0 (Simulator m) = 
         SimulatorState { as_TL = 0
                        , as_TN = 0 
                        , as_modelS = s0 m
@@ -80,22 +86,31 @@ instance (DEVS m) => Processor Simulator m where
                                , matchChan cr_sim_self mMsgStar
                                ]
         in do
-          let initState = proc_s0 p mod
+          let initState = proc_s0 p
           ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
           _ <- spawnLocal $ localLoop cr_self initState
           -- TODO store pid in registry ?
           return (cs_sim_self, cs_trans_self)
+\end{code}
 
+\section {Coordinator}
 
-data Coordinator = Coord
+\begin{code}
 
-instance (CoupledModel m) => Processor Coordinator m where
-    data ProcessorState Coordinator m = 
+-- | the 'Coordinator' type. See also 'Processor'
+newtype Coordinator m = Coordinator m
+
+-- | creates a new 'Coordinator' for the given 'CoupledModel'  
+mkCoordinator :: (CoupledModel m) => m -> Coordinator m
+mkCoordinator = Coordinator
+
+instance (CoupledModel m) => Processor (Coordinator m) m where
+    data ProcessorState (Coordinator m) m = 
         CoordinatorState {
           cs_TL :: T,
           cs_TN :: T
         }
-    proc_s0 p m = CoordinatorState {
+    proc_s0 (Coordinator m) = CoordinatorState {
                   cs_TL = 0,
                   cs_TN = 0
                 }
@@ -111,15 +126,16 @@ instance (CoupledModel m) => Processor Coordinator m where
                 in receiveWait [ matchChan cr_sim_self mMsgAt]
         in do
           ((cs_sim_self, cs_trans_self), cr_self) <- mkSimPorts
-          let initState = proc_s0 p m
+          let initState = proc_s0 p
           _ <- spawnLocal $ localLoop cr_self initState
           return (cs_sim_self, cs_trans_self)
+\end{code}
 
-        
 
---
--- utilities
---
+
+\section {Utility functions}
+
+\begin{code}
 
 procError :: String -> Process a
 procError msg = say msg >>= fail msg
@@ -135,9 +151,3 @@ mkSimPorts = do
 \end{code}
 
 
-
-class HasInfinite s where
-    infinity :: s 
-
-instance (RealFloat f) => HasInfinite f where
-    infinity = encodeFloat (floatRadix 0 - 1) (snd $ floatRange 0)
