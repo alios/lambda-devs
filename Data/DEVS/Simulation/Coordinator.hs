@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE Rank2Types #-}
 
 module Data.DEVS.Simulation.Coordinator
     ( Coordinator, mkCoordinator ) where
@@ -53,11 +54,14 @@ newtype Coordinator m = Coordinator m
 mkCoordinator :: (ProcessorModel m, CoupledModel m) => m -> Coordinator m
 mkCoordinator = Coordinator
 
+type ChildRef a = (SimPorts a, T)
+
 instance (ProcessorModel m, CoupledModel m) => Processor (Coordinator m) m where
     data ProcessorState (Coordinator m) m = 
         CoordinatorState {
           cs_TL :: T,
-          cs_TN :: T
+          cs_TN :: T,
+          cs_D :: (ProcessorModel a) => Set (ChildRef a)
         }
     data ProcessorConfig (Coordinator m) m = CoordinatorConfig 
 
@@ -65,7 +69,8 @@ instance (ProcessorModel m, CoupledModel m) => Processor (Coordinator m) m where
 
     proc_s0 (Coordinator m) = CoordinatorState {
                   cs_TL = 0 *~ second,
-                  cs_TN = 0 *~ second
+                  cs_TN = 0 *~ second,
+                  cs_D = Set.empty
                 }
     mkProcessor p cfg (cs_sim_parent, cs_tran_parent) m = 
         let localLoop cr_self s = updateCoordState s cr_self >>= localLoop cr_self

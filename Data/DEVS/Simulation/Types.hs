@@ -40,6 +40,8 @@ module Data.DEVS.Simulation.Types
     , SimulatorMsg (..)
     , TransportMsg (..)
     , SimPorts
+    , SimReceivePorts, SimSendPorts
+    , SimPortsT
     ) where
 
 
@@ -71,7 +73,7 @@ class (ProcessorModel m, Binary T) => Processor p m where
     readProcessorConfig = maybe defaultProcessorConfig id 
 
     -- | creates a touple of 'SimPorts' for 'SimulatorMsg' and 'TransportMsg'
-    mkPorts :: p -> Process (SimPorts m, (ReceivePort SimulatorMsg, ReceivePort (TransportMsg m)))
+    mkPorts :: p -> Process (SimPorts m)
     mkPorts p = do
       (cs_sim_self, cr_sim_self) <- newChan
       (cs_trans_self, cr_trans_self) <- newChan
@@ -81,9 +83,9 @@ class (ProcessorModel m, Binary T) => Processor p m where
 -- | type of a processor constructor. see 'mkProcessor'
 type ProcessorConstructor p m = 
     Maybe (ProcessorConfig p m) -- ^ Optional 'ProcessorConfig'
-    -> SimPorts m -- ^ 'SimPorts' for processor output
+    -> SimSendPorts m -- ^ 'SimPorts' for processor output
     -> m -- ^ the model run by the processor
-    -> Process (SimPorts m) -- ^ returns 'SimPorts' for processor input
+    -> Process (SimSendPorts m) -- ^ returns 'SimPorts' for processor input
         
 -- | messages used by processors for syncronization
 data SimulatorMsg 
@@ -99,7 +101,10 @@ data TransportMsg m
       deriving (Typeable)
 
 -- | a touple 'SendPort' used by 'Processor' for exchange of 'SimulatorMsg' and 'TransportMsg'
-type SimPorts m = (SendPort SimulatorMsg, SendPort (TransportMsg m))
+type SimPortsT p m = (p SimulatorMsg, p (TransportMsg m))
+type SimSendPorts m = SimPortsT SendPort m
+type SimReceivePorts m = SimPortsT ReceivePort m
+type SimPorts m = (SimSendPorts m, SimReceivePorts m)
 
 
 --- 
