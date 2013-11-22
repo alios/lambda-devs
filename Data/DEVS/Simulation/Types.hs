@@ -26,36 +26,58 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -}
 
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+
 
 module Data.DEVS.Simulation.Types
-    ( ProcessorModel (..)
+    ( ProcessorType (..)
+    , ProcessorModel (..)
     , Processor (..)
-    , ProcessorConstructor
-    , SimulatorMsg (..)
-    , TransportMsg (..)
-    , SimPorts
-    , SimReceivePorts, SimSendPorts
-    , SimPortsT
+    , mkProcessorRef
     ) where
 
-
-import Data.Typeable (Typeable)
-import Data.Data (Data)
-import Data.Binary
 import Control.Distributed.Process
+import Control.Distributed.Process.Serializable
+
 import Data.DEVS.Devs
+import Data.Typeable
+
+class ProcessorType t 
 
 -- | a 'Model' which is suitable to be used in a 'Processor'
-class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => ProcessorModel m
+class (Model m, Serializable (X m), Serializable (Y m), ProcessorType t) => 
+    ProcessorModel t m | m -> t where
 
 -- | a processor runs a model during simulation
-class (ProcessorModel m, Binary T) => Processor p m where
+class (ProcessorModel t m) => Processor t m where
+    data ProcessorConf t m :: *
+    data ProcessorCore t m :: *
+
+    -- | returns the processors default configuration
+    defaultProcessorConf :: ProcessorConf t m
+
+    -- | the processor constructor.
+    mkProcessor :: ProcessorConf t m -> m -> Process (ProcessorCore t m)
+
+    mkDefaultProcessor :: m -> Process (ProcessorCore t m)
+    mkDefaultProcessor = mkProcessor defaultProcessorConf
+
+
+mkProcessorRef :: (Processor t m) => ComponentRef -> Process (ProcessorCore t m)
+mkProcessorRef (MkComponentRef i') = 
+    let i = maybe (error "mkProcessorRef unable to cast model") id $ cast i'
+    in mkDefaultProcessor i
+
+
+{-
+-- | a 'Model' which is suitable to be used in a 'Processor'
+class (Model m, Typeable m, Binary T, Binary (X m), Binary (Y m), Ord (X m)) => ProcessorModel m
+    processor
+-- | a processor runs a model during simulation
+class (Typeable p, ProcessorModel m, Binary T) => Processor p m where
     data ProcessorState p m :: * 
     data ProcessorConfig p m :: *
     
@@ -148,3 +170,4 @@ instance (ProcessorModel m) => Binary (TransportMsg m) where
       else fail $ "parseError SimulatorMsg: expected 0x01, got " ++ show b1
 
 
+-}

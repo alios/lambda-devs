@@ -29,25 +29,35 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Data.DEVS.Simulation.Simulator
-    ( Simulator, mkSimulator ) where
+    ( Atomic ) where
 
-import Data.Binary (Binary)
-import Data.Set (Set)
-import qualified Data.Set as Set
 import Control.Distributed.Process
-import Data.DEVS.Devs
-import Data.DEVS.Simulation.Types
-import Data.DEVS.Simulation.Helpers
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
+import Data.DEVS.Devs
+import Data.DEVS.Simulation.Types
 
 
+data Atomic
+
+instance ProcessorType Atomic
+
+instance (ProcessorModel Atomic m, AtomicModel m) => Processor Atomic m where
+    data ProcessorConf Atomic m = SimulatorConf {}
+    data ProcessorCore Atomic m = Simulator m
+    defaultProcessorConf = SimulatorConf
+    mkProcessor conf m = do
+
+      return $ Simulator m
+
+
+{-
 -- | the 'Simulator' type. See also 'Processor'
 newtype Simulator m = Simulator m
+    deriving (Typeable)
 
 -- | creates a new 'Simulator' for the given 'DEVS' 
 mkSimulator :: (ProcessorModel m, DEVS m) => m -> Simulator m
@@ -119,3 +129,4 @@ instance (ProcessorModel m, DEVS m) => Processor (Simulator m) m where
           -- TODO store pid in registry ?
           return (cs_sim_self, cs_trans_self)
 
+-}

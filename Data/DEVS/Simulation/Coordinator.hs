@@ -29,32 +29,62 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Rank2Types #-}
 
-module Data.DEVS.Simulation.Coordinator
-    ( Coordinator, mkCoordinator ) where
+{-# LANGUAGE ImpredicativeTypes #-}
 
-import Data.Binary (Binary)
+module Data.DEVS.Simulation.Coordinator
+    ( Coupled ) where
+
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Control.Distributed.Process
+import Data.Typeable 
+import Data.DEVS.Simulation.Types
 import Data.DEVS.Devs
 import Data.DEVS.Simulation.Types
-import Data.DEVS.Simulation.Helpers
+import Control.Distributed.Process
 
-import qualified Prelude as P
-import Numeric.Units.Dimensional.Prelude
+data Coupled
+
+instance ProcessorType Coupled
+
+instance (ProcessorModel Coupled m, CoupledModel m) => Processor Coupled m where
+    data ProcessorConf Coupled m = 
+        CoordinatorConf { coord_compConfs :: forall i t . (ProcessorModel t i) 
+                                            => Map i (ProcessorConf t i) 
+                        }
+
+    data ProcessorCore Coupled m = Coordinator m
+    defaultProcessorConf = 
+        CoordinatorConf { coord_compConfs = Map.empty
+                        }
+
+    mkProcessor conf m =
+      let crs = Set.toList $ componentRefs m
+ --         procsM = sequence $ map (mkProcessorRef) crs
+      in do return $ Coordinator m
+
+
+
+
+
+{-
 
 -- | the 'Coordinator' type. See also 'Processor'
 newtype Coordinator m = Coordinator m
+    deriving (Typeable, Data)
 
 -- | creates a new 'Coordinator' for the given 'CoupledModel'  
 mkCoordinator :: (ProcessorModel m, CoupledModel m) => m -> Coordinator m
 mkCoordinator = Coordinator
 
-type ChildRef a = (SimPorts a, T)
+type ChildMap = (ProcessorModel m) => IntMap (ChildRef m)
+newtype ChildRef m = ChildRef (m, Set Influencer)
+type Influencer = (ProcessorModel m) => (m, Z i m)
 
 instance (ProcessorModel m, CoupledModel m) => Processor (Coordinator m) m where
     data ProcessorState (Coordinator m) m = 
@@ -87,3 +117,5 @@ instance (ProcessorModel m, CoupledModel m) => Processor (Coordinator m) m where
           let initState = proc_s0 p
           _ <- spawnLocal $ localLoop cr_self initState
           return (cs_sim_self, cs_trans_self)
+
+-}
