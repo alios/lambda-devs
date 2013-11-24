@@ -32,8 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE Rank2Types #-}
-
-{-# LANGUAGE ImpredicativeTypes #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.DEVS.Simulation.Coordinator
     ( Coupled ) where
@@ -48,29 +47,46 @@ import Data.DEVS.Devs
 import Data.DEVS.Simulation.Types
 import Control.Distributed.Process
 
-data Coupled
+data Coupled deriving (Typeable)
+
 
 instance ProcessorType Coupled
 
-instance (ProcessorModel Coupled m, CoupledModel m) => Processor Coupled m where
-    data ProcessorConf Coupled m = 
-        CoordinatorConf { coord_compConfs :: forall i t . (ProcessorModel t i) 
-                                            => Map i (ProcessorConf t i) 
-                        }
 
-    data ProcessorCore Coupled m = Coordinator m
+instance Processor Coupled where
+    data ProcessorConf Coupled = 
+        CoordinatorConf { coord_compConfs ::  forall t . (ProcessorType t)
+                                             => Map (ProcModelT t) (ProcessorConf t) 
+                        }
     defaultProcessorConf = 
         CoordinatorConf { coord_compConfs = Map.empty
                         }
 
-    mkProcessor conf m =
-      let crs = Set.toList $ componentRefs m
- --         procsM = sequence $ map (mkProcessorRef) crs
-      in do return $ Coordinator m
+
+    data ProcessorCore Coupled = 
+        CoordinatorState { coord_model :: ProcModelT Coupled 
+                         , coord_procs :: [ProcRef]
+                         }
+                                 
 
 
 
+    mkProcessor conf' (PM m' mconf) =
+      let conf = maybe conf' id mconf
+          m = maybe (error $ "mkProcessor of Coordinator must be called with an CoupledModel") id
+              (cast  m') 
 
+      in do 
+        proc_say conf $ "creating Coordinator for model " ++ show m
+        return . MkProcRef $ CoordinatorState {
+                             coord_model = m,
+                             coord_procs = []
+                           }
+               
+
+
+
+      
 
 {-
 

@@ -30,13 +30,15 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
-
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.DEVS.Simulation.Types
     ( ProcessorType (..)
     , ProcessorModel (..)
+    , ProcModelT (..)
     , Processor (..)
-    , mkProcessorRef
+    , ProcRef (..)
     ) where
 
 import Control.Distributed.Process
@@ -45,31 +47,63 @@ import Control.Distributed.Process.Serializable
 import Data.DEVS.Devs
 import Data.Typeable
 
+
 class ProcessorType t 
 
+data ProcModelT t = forall m . (ProcessorModel t m ) => 
+                    PM { proc_model :: m
+                       , proc_conf :: Maybe (ProcessorConf t)
+                       }
+                  deriving (Typeable)
+
+instance Show (ProcModelT t) where
+    show (PM m _) = show m
+
+instance Eq (ProcModelT t) where
+    (PM a _) == (PM b _) = case (cast b) of
+                        Nothing -> False
+                        Just b' -> a == b'
+                    
+instance Ord (ProcModelT t) where
+    compare (PM a _) (PM b _) = case (cast b) of
+                              Nothing -> compare (show a) (show b)
+                              Just b' -> compare a b'
+              
 -- | a 'Model' which is suitable to be used in a 'Processor'
 class (Model m, Serializable (X m), Serializable (Y m), ProcessorType t) => 
     ProcessorModel t m | m -> t where
+                       procModelWith ::  Maybe (ProcessorConf t) -> m -> ProcModelT t
+                       procModelWith conf m = PM m conf
+                       procModel :: m -> ProcModelT t
+                       procModel = procModelWith Nothing
 
 -- | a processor runs a model during simulation
-class (ProcessorModel t m) => Processor t m where
-    data ProcessorConf t m :: *
-    data ProcessorCore t m :: *
+class Processor t where
+    data ProcessorConf t :: *
+    data ProcessorCore t :: *
 
     -- | returns the processors default configuration
-    defaultProcessorConf :: ProcessorConf t m
+    defaultProcessorConf :: ProcessorConf t
 
-    -- | the processor constructor.
-    mkProcessor :: ProcessorConf t m -> m -> Process (ProcessorCore t m)
+    -- | start a new processor with given config.
+    mkProcessor :: ProcessorConf t -> ProcModelT t -> Process ProcRef
 
-    mkDefaultProcessor :: m -> Process (ProcessorCore t m)
+    -- | start a new processor with default config.
+    mkDefaultProcessor :: ProcModelT t -> Process ProcRef
     mkDefaultProcessor = mkProcessor defaultProcessorConf
 
+    -- | let the processor say a message 
+    proc_say :: ProcessorConf t -> String -> Process ()
+    proc_say c msg = do say $ msg
 
-mkProcessorRef :: (Processor t m) => ComponentRef -> Process (ProcessorCore t m)
-mkProcessorRef (MkComponentRef i') = 
-    let i = maybe (error "mkProcessorRef unable to cast model") id $ cast i'
-    in mkDefaultProcessor i
+    -- | error: will output error message and call 'error'
+    proc_error :: ProcessorConf t -> String -> Process ()
+    proc_error c err = do proc_say c err ; fail err
+
+
+data ProcRef = forall t . MkProcRef (ProcessorCore t)
+
+
 
 
 {-

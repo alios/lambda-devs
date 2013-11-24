@@ -30,10 +30,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.DEVS.Simulation.Simulator
     ( Atomic ) where
 
+import Data.Typeable (Typeable, cast)
 import Control.Distributed.Process
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
@@ -41,17 +43,25 @@ import Data.DEVS.Devs
 import Data.DEVS.Simulation.Types
 
 
-data Atomic
+data Atomic deriving (Typeable)
 
 instance ProcessorType Atomic
 
-instance (ProcessorModel Atomic m, AtomicModel m) => Processor Atomic m where
-    data ProcessorConf Atomic m = SimulatorConf {}
-    data ProcessorCore Atomic m = Simulator m
+instance Processor Atomic where
+    data ProcessorConf Atomic = SimulatorConf {}
+    data ProcessorCore Atomic = 
+        SimulatorState { sim_model :: ProcModelT Atomic }
+                       
     defaultProcessorConf = SimulatorConf
-    mkProcessor conf m = do
-
-      return $ Simulator m
+    mkProcessor conf m' = 
+        let m = maybe 
+                (error $ "mkProcessor of Simulator must be called with an AtomicModel.") id
+                (cast  m') 
+        in do
+          proc_say conf $ "creating Simulator for model " ++ show m
+          return . MkProcRef $ SimulatorState
+                     { sim_model = m }
+                            
 
 
 {-

@@ -55,9 +55,6 @@ type T = Time Double
 t_infinity :: T
 t_infinity = infinity *~ second
 
-instance Binary T where
-    put = (put :: Time Double -> Put)
-    get = (get :: Get (Time Double))
 
 class (Typeable m, Ord m, Show m) => Model m where
     type X m :: *
@@ -67,7 +64,6 @@ class (Typeable m, Ord m, Show m) => Model m where
     s0 :: m -> S m
     selfRef :: m -> ComponentRef
     selfRef m = MkComponentRef m
-
     lambda :: m -> S m -> Y m
     delta_ext :: m -> S m -> T -> Set (X m) -> S m
     delta_int :: m -> S m -> S m
@@ -115,23 +111,22 @@ data Z i j where
 
 instance Eq (ComponentRef) where
     (MkComponentRef m1) == (MkComponentRef m2) =
-        let m2' = cast m2
-        in case (m2') of
-             Nothing -> False
-             Just m2'' -> m1 == m2''
+        case (cast m2) of
+          Nothing -> False
+          Just m2' -> m1 == m2'
 
 instance Ord (ComponentRef) where
     compare (MkComponentRef m1) (MkComponentRef m2) =
-        let m2' = cast m2
-            sm1 = show m1
-            sm2 = show m2
-        in case (m2') of
-             Just m2'' -> compare m1 m2''
-             Nothing -> compare sm1 sm2
+        case (cast m2) of 
+          Nothing -> compare (show m1) (show m2)
+          Just m2' -> compare m1 m2'
 
 instance Show (ComponentRef) where
     show (MkComponentRef m) = "MkComponentRef (" ++ show m  ++ ")"
 
+instance Binary T where
+    put = (put :: Time Double -> Put)
+    get = (get :: Get (Time Double))
 
 
 
