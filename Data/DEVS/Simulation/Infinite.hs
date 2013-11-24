@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 {-
 Copyright (c) 2013, Markus Barenhoff <alios@alios.org>
 All rights reserved.
@@ -28,17 +26,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -}
 
-module Data.DEVS.Simulation.Helpers
-    (procError) where
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
-import Control.Distributed.Process
-import Data.DEVS.Simulation.Types
-import Data.DEVS.Devs
-import Data.Binary 
--- | outputs 'msg' using 'say' and then calls 'fail'
-procError :: String -> Process a
-procError msg = say msg >>= fail msg
+module Data.DEVS.Simulation.Infinite where
 
--- | create new channels for 'SimulatorMsg' and 'TransportMsg'
---mkSimPorts = do
+class HasInfinite s where
+    infinity :: s 
 
+instance (RealFloat f) => HasInfinite f where
+    infinity = encodeFloat (floatRadix 0 - 1) (snd $ floatRange 0)
