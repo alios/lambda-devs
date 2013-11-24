@@ -15,7 +15,9 @@ stability:           alpha
 
 -- A short (one-line) description of the package.
 synopsis:            a Paralell-DEVS implementaion based on distributed-process
-
+description:         The Discrete Event System Sepcification (DEVS) formalism
+                     defines discrete event simulation models in a hierachical, 
+                     modular manner.
 -- A longer description of the package.
 -- description:         
 
@@ -38,7 +40,7 @@ maintainer:          alios@alios.org
 -- A copyright notice.
 -- copyright:           
 
-category:            Language
+category:            Control, Simulation
 
 build-type:          Simple
 
@@ -83,7 +85,7 @@ library
 
  
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.6, 
+  build-depends:       base >=4.6 && <= 5, 
                        binary >=0.5, 
                        containers >=0.5, 
                        distributed-process >=0.4,
@@ -97,7 +99,7 @@ library
   
 executable lambda-devs-example
   main-is:             Example.hs
-  build-depends:       base >= 4.6,
+  build-depends:       base >= 4.6 && <= 5,
                        binary >= 0.5,
                        containers >= 0.5,
                        distributed-process >= 0.4,
