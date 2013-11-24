@@ -31,11 +31,20 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE ExistentialQuantification #-}
 
+
+-- | The /Discrete Event System Sepcification (DEVS)/ formalism defines
+--   discrete event simulation models in a hierachical, modular manner.
 module Data.DEVS.Devs 
-    (T, t_infinity
-    , Model (..)
+    ( -- * Parallel DEVS
+      PDEVS (..)
+      -- * Time base 
+    , T, t_infinity
+      -- * AtomicModel  
     , AtomicModel (..)
-    , CoupledModel (..), ComponentRef (..), Z (..)
+      -- * CoupledModel
+    , CoupledModel (..), ComponentRef, Z (..)
+      -- * References
+      -- $references
     ) where
 
 import Data.Binary
@@ -50,29 +59,59 @@ import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
 import Data.DEVS.Simulation.Infinite
 
+-- | The 'Time' type 'T' used in "Data.DEVS"
 type T = Time Double
+
+-- | the inifinite time
 t_infinity :: T
 t_infinity = infinity *~ second
 
-
-class (Typeable m, Ord m, Show m) => Model m where
-    type X m :: *
+-- | The /Parallel DEVS (P-DEVS)/ Model [PDEVS94].
+class (Typeable m, Ord m, Show m) => PDEVS m where
+    type X m :: * 
     type Y m :: *
     data S m :: *
 
+    -- | the models initial state
     s0 :: m -> S m
+
+    -- | the internal transition function
+    delta_int :: m -- ^ the model
+              -> S m -- ^ the current state
+              -> S m -- ^ the new state
+
+    -- | the external transition function
+    delta_ext :: m -- ^ the model 
+              -> S m -- ^ the current state
+              -> T -- ^ the current time
+              -> Set (X m) -- ^ the set of input events at current time
+              -> S m -- ^ the new state
+
+    -- | the confluent transition function
+    delta_con :: m -- ^ the model 
+              -> S m -- ^ the current state
+              -> Set (X m) -- ^ the set of input events at current time
+              -> S m -- ^ the new state
+
+    -- | the output function of the model.
+    lambda :: m -- ^ the model 
+           -> S m -- ^ the current state
+           -> Y m -- ^ the output
+
+    -- | the time advance function
+    ta :: m -- ^ the model 
+       -> S m -- ^ the current state
+       -> T -- ^ the time of next internal event
+
+    -- | a reference to the model it self as a component of a 'CoupledModel'.
     selfRef :: m -> ComponentRef
     selfRef m = MkComponentRef m
-    lambda :: m -> S m -> Y m
-    delta_ext :: m -> S m -> T -> Set (X m) -> S m
-    delta_int :: m -> S m -> S m
-    delta_con :: m -> S m -> Set (X m) -> S m
-    ta :: m -> S m -> T
 
-class (Model m) => AtomicModel m
+-- | A 'PDEVS' model which does not have furter 'ComponentRef's
+class (PDEVS m) => AtomicModel m
 
-
-class (Model d) => CoupledModel d where
+-- | A 'PDEVS' model which is composed out of other 'AtomicModel' or 'CoupledModel'
+class (PDEVS d) => CoupledModel d where
     -- | the set of 'CoupledModel's components
     componentRefs ::  d -> Set ComponentRef
 
@@ -99,13 +138,27 @@ class (Model d) => CoupledModel d where
             allinfs = Map.insert (selfRef d) (selfInfluencers d) crefs
         in allinfs
     
+-- | a Reference to a 'PDEVS' component hiding its model
+data ComponentRef = forall m . (PDEVS m) => MkComponentRef m
 
-data ComponentRef = forall m . (Model m) => MkComponentRef m
-
+-- | a @i@-to-@j@ output translation used for coupleing the components of a 'CoupledModel'.
+--
+--  [@ExtCoup@] external coupling (translate 'CoupledModel' @i@ input to component @j@ input)
+--
+--  [@IntCoup@] internal coupling (translate component @i@ output to component @j@ input)
+--
+--  [@OutCoup@] internal coupling (translate component @i@ output to 'CoupledModel' @j@ output)
 data Z i j where
-    ExtCoup :: ((X i) -> (X j)) -> Z i j
-    IntCoup :: ((Y i) -> (X j)) -> Z i j
+    ExtCoup :: ((X i) -> (X j)) 
+            -> Z i j
+    IntCoup :: ((Y i) -> (X j))  
+            -> Z i j
     OutCoup :: ((Y i) -> (Y j)) -> Z i j
+
+
+-- $references
+-- * [PDEVS94] Chow, A.C.; Zeigler, B.P., /Parallel DEVS: a parallel, hierarchical, modular modeling formalism/, Simulation Conference Proceedings, 1994. Winter, pp.716,722, 11-14 Dec. 1994, URL: <http://www.bgc-jena.mpg.de/~twutz/devsbridge/pub/chow96_parallelDEVS.pdf>
+
 
 
 instance Eq (ComponentRef) where
