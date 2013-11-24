@@ -10,7 +10,8 @@ name:                lambda-devs
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.3.0
+version:             0.3.1
+stability:           alpha
 
 -- A short (one-line) description of the package.
 synopsis:            a Paralell-DEVS implementaion based on distributed-process
@@ -47,6 +48,13 @@ extra-source-files:  README.md, LICENSE
 
 -- Constraint on the version of Cabal needed to build this package.
 cabal-version:       >=1.10
+
+tested-with:         GHC == 7.6.3
+
+
+source-repository head
+  type:     git
+  location: https://github.com/alios/lambda-devs.git
 
 
 library
