@@ -27,13 +27,13 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -}
 
 module Data.DEVS.Simulation
-    ( ProcessorModel (..)
+    ( module Data.DEVS.Simulation.Processor
     , module Data.DEVS.Simulation.Simulator
     , module Data.DEVS.Simulation.Coordinator
     ) where
 
 
-import Data.DEVS.Simulation.Types 
+import Data.DEVS.Simulation.Processor
 import Data.DEVS.Simulation.Simulator
 import Data.DEVS.Simulation.Coordinator
 

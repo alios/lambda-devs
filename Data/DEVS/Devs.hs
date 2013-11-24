@@ -48,7 +48,6 @@ import qualified Data.Set as Set
 
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
-
 import Data.DEVS.Simulation.Infinite
 
 type T = Time Double

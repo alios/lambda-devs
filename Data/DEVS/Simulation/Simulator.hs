@@ -33,110 +33,32 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.DEVS.Simulation.Simulator
-    ( Atomic ) where
+    ( Simulator, Processor (..)) where
 
 import Data.Typeable (Typeable, cast)
 import Control.Distributed.Process
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
-import Data.DEVS.Devs
-import Data.DEVS.Simulation.Types
+import Data.DEVS.Simulation.Processor
 
 
-data Atomic deriving (Typeable)
+data Simulator deriving (Typeable)
 
-instance ProcessorType Atomic
+instance ProcessorType Simulator
 
-instance Processor Atomic where
-    data ProcessorConf Atomic = SimulatorConf {}
-    data ProcessorCore Atomic = 
-        SimulatorState { sim_model :: ProcModelT Atomic }
+instance Processor Simulator where
+    data ProcessorConf Simulator = SimulatorConf {}
+    data ProcessorState Simulator = 
+        SimulatorState { sim_model :: ProcessorModelT Simulator }
                        
     defaultProcessorConf = SimulatorConf
-    mkProcessor conf m' = 
+    mkProcessor conf (PM m' mconf) = 
         let m = maybe 
                 (error $ "mkProcessor of Simulator must be called with an AtomicModel.") id
                 (cast  m') 
         in do
           proc_say conf $ "creating Simulator for model " ++ show m
-          return . MkProcRef $ SimulatorState
+          return . MkProcessorT $ SimulatorState
                      { sim_model = m }
                             
 
-
-{-
--- | the 'Simulator' type. See also 'Processor'
-newtype Simulator m = Simulator m
-    deriving (Typeable)
-
--- | creates a new 'Simulator' for the given 'DEVS' 
-mkSimulator :: (ProcessorModel m, DEVS m) => m -> Simulator m
-mkSimulator = Simulator
-
-instance (ProcessorModel m, DEVS m) => Processor (Simulator m) m where
-    data ProcessorState (Simulator m) m = 
-        SimulatorState {
-          as_TL :: T,
-          as_TN :: T,
-          as_modelS :: S m,
-          as_bag :: Set (X m)
-        }
-
-    data ProcessorConfig (Simulator m) m = SimulatorConfig 
-    defaultProcessorConfig = SimulatorConfig
-
-    proc_s0 (Simulator m) = 
-        SimulatorState { as_TL = 0 *~ second
-                       , as_TN = 0 *~ second
-                       , as_modelS = s0 m
-                       , as_bag = Set.empty
-                       }
-
-    mkProcessor p cfg' (cs_sim_parent, cs_trans_parent) mod =
-        let cfg = readProcessorConfig cfg'
-            localLoop cr_self s = updateSimState s cr_self >>= localLoop cr_self
-            updateSimState s (cr_sim_self, cr_trans_self) =
-                let mMsgAt (MsgAt t) = 
-                        if (t == as_TN s)
-                        then let y = (lambda mod (as_modelS s)) 
-                             in do sendChan cs_trans_parent $ MsgY t y
-                                   sendChan cs_sim_parent $ MsgDone t
-                                   return s
-                        else procError "simulator error: received MsgAt at t != TN"
-                    mMsgQ (MsgQ t q) = do
-                      sendChan cs_sim_parent $ MsgDone t
-                      return $ s { as_bag = Set.insert q (as_bag s) }
-                    mMsgStar msg@(MsgStar t) = do
-                      s' <- mMsgStar' msg
-                      let tn = t + ta mod (as_modelS s')
-                      sendChan cs_sim_parent $ MsgDone tn
-                      return $ s' { as_TL = t
-                                  , as_TN = tn
-                                  }              
-                    mMsgStar' (MsgStar t)
-                        | p_ext t = updSt s True  
-                                    (delta_ext mod (as_modelS s) (t - (as_TL s)) (as_bag s))
-                        | p_int t = updSt s False 
-                                    (delta_int mod (as_modelS s))
-                        | p_con t = updSt s True  
-                                    (delta_con mod (as_modelS s) (as_bag s))
-                        | otherwise = procError "simulator error: received MsgStar at t>TN or t<TL"
-                      where p_ext t = (as_TL s <= t) && (t < as_TN s) && (not . Set.null $ as_bag s)
-                            p_int t = (as_TN s == t) && (Set.null $ as_bag s)
-                            p_con t = (as_TN s == t) && (not . Set.null $ as_bag s)
-                            updSt s empt s' = 
-                                return s { as_modelS = s'
-                                         , as_bag = if empt then Set.empty else as_bag s 
-                                         }
-                in receiveWait [ matchChan cr_sim_self mMsgAt
-                               , matchChan cr_trans_self mMsgQ
-                               , matchChan cr_sim_self mMsgStar
-                               ]
-        in do
-          let initState = proc_s0 p
-          ((cs_sim_self, cs_trans_self), cr_self) <- mkPorts p
-          _ <- spawnLocal $ localLoop cr_self initState
-          -- TODO store pid in registry ?
-          return (cs_sim_self, cs_trans_self)
-
--}

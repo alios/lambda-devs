@@ -10,7 +10,7 @@ name:                lambda-devs
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.2.0
+version:             0.3.0
 
 -- A short (one-line) description of the package.
 synopsis:            a Paralell-DEVS implementaion based on distributed-process
@@ -53,22 +53,23 @@ library
   -- Modules exported by the library.
   exposed-modules:     Data.DEVS, 
                        Data.DEVS.Devs
-                       Data.DEVS.Simulation, 
-                       Data.DEVS.Simulation.Types 
+                       Data.DEVS.Simulation 
+                       Data.DEVS.Simulation.Processor
                        Data.DEVS.Simulation.Simulator 
                        Data.DEVS.Simulation.Coordinator
   
   -- Modules included in this library but not exported.
-  other-modules:       Data.DEVS.Simulation.Helpers
-                       Data.DEVS.Simulation.Infinite
+  other-modules:       Data.DEVS.Simulation.Infinite
+
                       
   -- LANGUAGE extensions used by modules in this package.
   other-extensions:    MultiParamTypeClasses,
+                       DeriveDataTypeable,
+                       GADTs,
                        TypeFamilies, 
                        FlexibleInstances,
                        FlexibleContexts,
                        UndecidableInstances,
-                       GADTs,
                        ExistentialQuantification,
                        FunctionalDependencies
 
@@ -78,7 +79,8 @@ library
                        binary >=0.5, 
                        containers >=0.5, 
                        distributed-process >=0.4,
-                       dimensional >= 0.12
+                       dimensional >= 0.12,
+                       numtype >= 1.0
   
   -- Directories containing source files.
   -- hs-source-dirs:      
