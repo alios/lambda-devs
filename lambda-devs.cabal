@@ -79,12 +79,24 @@ library
                        binary >=0.5, 
                        containers >=0.5, 
                        distributed-process >=0.4,
-                       dimensional >= 0.12,
-                       numtype >= 1.0
+                       dimensional >= 0.12
   
   -- Directories containing source files.
   -- hs-source-dirs:      
   
   -- Base language which the package is written in.
   default-language:    Haskell2010
+  
+executable lambda-devs-example
+  main-is:             Example.hs
+  build-depends:       base >= 4.6,
+                       binary >= 0.5,
+                       containers >= 0.5,
+                       distributed-process >= 0.4,
+                       lambda-devs >= 0.3,
+                       numtype >= 1.0,
+                       dimensional >= 0.12
+
+
+  default-language: Haskell2010
   
