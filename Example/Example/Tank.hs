@@ -43,7 +43,7 @@ instance Binary TankCmd
 instance Binary TankEvent 
 
 
-instance Model Tank where
+instance PDEVS Tank where
     type X Tank = TankCmd
     type Y Tank = TankEvent
     data S Tank = 

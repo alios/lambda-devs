@@ -15,7 +15,7 @@ import Numeric.Units.Dimensional.Prelude
 import Numeric.NumType (Zero, Pos3, Neg1)
 
 data Engine = Engine deriving (Typeable, Ord, Eq, Show)
-instance Model Engine where
+instance PDEVS Engine where
     type Y Engine = Int
     type X Engine = Int
 instance AtomicModel Engine

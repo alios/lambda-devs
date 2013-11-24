@@ -153,7 +153,8 @@ data Z i j where
             -> Z i j
     IntCoup :: ((Y i) -> (X j))  
             -> Z i j
-    OutCoup :: ((Y i) -> (Y j)) -> Z i j
+    OutCoup :: ((Y i) -> (Y j)) 
+            -> Z i j
 
 
 -- $references

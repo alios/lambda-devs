@@ -21,7 +21,7 @@ import Example.Tank
 import Example.Engine
 
 data Ship = Ship deriving (Typeable, Ord, Eq, Show)
-instance Model Ship where
+instance PDEVS Ship where
     type Y Ship = Maybe String
     type X Ship = Maybe String
 instance ProcessorModel Coordinator Ship
