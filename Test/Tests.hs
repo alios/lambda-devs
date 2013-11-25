@@ -2,20 +2,10 @@ module Main (main) where
 
 import Data.Monoid
 import Test.Framework
-import Test.Framework.Providers.HUnit
-import Test.Framework.Providers.QuickCheck2
-import Test.HUnit
-import Test.QuickCheck
+
+import Tests.DevsTest
 
 main :: IO ()
 main = defaultMainWithOpts
-       [ testCase "rev" testRev
-       , testProperty "listRevRevId" propListRevRevId
+       [ devs_tests
        ] mempty
-
-testRev :: Assertion
-testRev = reverse [1, 2, 3] @?= [3, 2, 1]
-
-propListRevRevId :: [Int] -> Property
-propListRevRevId xs = not (null xs) ==> reverse (reverse xs) == xs
-
