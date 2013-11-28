@@ -107,6 +107,7 @@ class (Typeable m, Ord m, Show m) => PDEVS m where
     selfRef :: m -> ComponentRef
     selfRef m = MkComponentRef m
 
+
 -- | A 'PDEVS' model which does not have furter 'ComponentRef's
 class (PDEVS m) => AtomicModel m
 
@@ -155,6 +156,7 @@ data Z i j where
             -> Z i j
     OutCoup :: ((Y i) -> (Y j)) 
             -> Z i j
+
 
 
 -- $references

@@ -40,6 +40,7 @@ import Control.Distributed.Process
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
 import Data.DEVS.Simulation.Processor
+import Control.Monad.State
 
 
 data Simulator deriving (Typeable)
@@ -52,13 +53,15 @@ instance Processor Simulator where
         SimulatorState { sim_model :: ProcessorModelT Simulator }
                        
     defaultProcessorConf = SimulatorConf
-    mkProcessor conf (PM m' mconf) = 
+    mkProcessor conf proc_out_schan (PM m' mconf) = 
         let m = maybe 
                 (error $ "mkProcessor of Simulator must be called with an AtomicModel.") id
                 (cast  m') 
         in do
           proc_say conf $ "creating Simulator for model " ++ show m
-          return . MkProcessorT $ SimulatorState
-                     { sim_model = m }
+          let s0 = SimulatorState { sim_model = m }
+          put s0
+          (proc_in_schan, proc_in_rchan) <- newChan
+          return proc_in_schan 
                             
 
