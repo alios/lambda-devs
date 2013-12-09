@@ -26,89 +26,30 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -}
 
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE Rank2Types #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE RankNTypes #-}
 
-module Data.DEVS.Simulation.Coordinator ( Coordinator, Processor (..)) where
+module Data.DEVS.Simulation.Coordinator where
 
 import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Set (Set)
-import qualified Data.Set as Set
-import Data.Typeable 
+import Control.Distributed.Process
+import Control.Concurrent.MSemN (MSemN)
+import qualified Data.IntMap as IntMap
 import Data.DEVS.Devs
 import Data.DEVS.Simulation.Processor
-import Control.Distributed.Process
-import Control.Monad.State
 
-data Coordinator deriving (Typeable)
-
-
-instance ProcessorType Coordinator
+data CoordState m = CoordState {
+      coord_sem_count :: MSemN Int,
+      coord_comp_tN :: forall i j . Map (ComponentRef i j) T
+    }
 
 
-data ReceivedMessage
-
-type MessageBag = Set ReceivedMessage
-
-coord_imm :: T -> ProcessorState Coordinator -> forall t . Set (ProcessorT t)
-coord_imm t = Map.keysSet . Map.filter ((==) t) . coord_procs
-
-coord_inn :: T -> ProcessorState Coordinator -> forall t . Set (ProcessorT t)
-coord_inn t s =
-    let imm = coord_imm t s
-        inn_filter p = case Map.lookup p $ coord_bags s of
-                         Nothing -> False
-                         Just b -> not (Set.null b)
-    in Set.filter inn_filter imm
-
-instance Processor Coordinator where
-    data ProcessorConf Coordinator = 
-        CoordinatorConf { coord_compConfs ::  forall t . (ProcessorType t)
-                                             => Map (ProcessorModelT t) (ProcessorConf t) 
-                        }
-    defaultProcessorConf = 
-        CoordinatorConf { coord_compConfs = Map.empty
-                        }
 
 
-    data ProcessorState Coordinator = 
-        CoordinatorState { coord_model :: ProcessorModelT Coordinator 
-                         , coord_procs :: forall t . Map (ProcessorT t) T
-                         , coord_bags  :: forall t . Map (ProcessorT t) MessageBag
-                         }
-                                 
-    proc_s0 m = CoordinatorState { coord_model = m, coord_procs = Map.empty, coord_bags = Map.empty }
-    proc_onSync c p x_count t = 
-        let imm = coord_imm t (proc_state p)
-            inn = coord_inn t (proc_state p)
-            es = Set.toList $ Set.union imm inn -- (Set (ProcessorT t0)
-            isSelfE e = e == p
-            f e = do return ()
-        in do _ <- sequence $ map f es
-              return ()
-
---    proc_onSync conf p i t = do
-      
-{-
-    mkProcessor conf' proc_out_schan (PM m' mconf) =
-      let conf = maybe conf' id mconf
-          m = maybe (error $ "mkProcessor of Coordinator must be called with a CoupledModel") id
-              (cast  m') 
-
-      in do 
-        proc_say conf $ "creating Coordinator for model " ++ show m
-        (proc_in_schan, proc_in_rchan) <- newChan
-        put $ CoordinatorState 
-                { coord_model = m
-                , coord_procs = []
-                }
-
-        return proc_in_schan 
--}
+mkCoord :: (CoupledModel m) => ProcessorModel () (X m) (Y m) -> Process (CoordState m)
+mkCoord (CoordinatorModel is sis) = do
+  let x = IntMap.mapWithKey f is
+  return undefined
+      where f :: IntMap.Key -> Influencer x -> Process (IntMap.Key, (SendPort (SimMsg (X i)), ReceivePort (SimMsg (Y i))))
+            f k (Influencer ((Ref pm), comp_is)) = undefined
 

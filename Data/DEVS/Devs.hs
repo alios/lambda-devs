@@ -29,159 +29,125 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ImpredicativeTypes #-}
 
 
 -- | The /Discrete Event System Sepcification (DEVS)/ formalism defines
 --   discrete event simulation models in a hierachical, modular manner.
 module Data.DEVS.Devs 
     ( -- * Parallel DEVS
-      PDEVS (..)
+      Model (..), DeltaInt (..), DeltaExt (..), DeltaCon (..), Lambda (..), Ta (..)
       -- * Time base 
     , T, t_infinity
       -- * AtomicModel  
     , AtomicModel (..)
       -- * CoupledModel
-    , CoupledModel (..), ComponentRef, Z (..)
+    , CoupledModel (..), Influencer (..), Influencers, SelfInfluencer (..), SelfInfluencers
+      -- * ProcessorModel
+    , ProcessorModel (..), ComponentRef(..)
       -- * References
       -- $references
     ) where
 
 import Data.Binary
-import Data.Typeable (Typeable, cast)
 import Data.Set (Set)
-import Data.Map (Map)
-import Data.Maybe (isJust)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-
+import Data.IntMap
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
+import Control.Distributed.Process.Serializable
 import Data.DEVS.Simulation.Infinite
 
 -- | The 'Time' type 'T' used in "Data.DEVS"
 type T = Time Double
 
+instance Binary T where
+    put t = put $ t /~ second
+    get = do t <- get
+             return $ t *~ second
+
+
 -- | the inifinite time
 t_infinity :: T
 t_infinity = infinity *~ second
 
+
+data DeltaInt s = DeltaInt (s -> s)
+data DeltaExt s x = DeltaExt (s -> T -> Set x -> s)
+data DeltaCon s x = DeltaCon (s -> Set x -> s)
+data Lambda s y = Lambda (s -> Set y)
+data Ta s = Ta (s -> T)
+
+
+
+
 -- | The /Parallel DEVS (P-DEVS)/ Model [PDEVS94].
-class (Typeable m, Ord m, Show m) => PDEVS m where
+class (Ord (X m), Serializable (X m), Ord (Y m), Serializable (Y m)) => Model m where
     type X m :: * 
     type Y m :: *
     data S m :: *
 
     -- | the models initial state
-    s0 :: m -> S m
+    s0 :: S m
 
     -- | the internal transition function
-    delta_int :: m -- ^ the model
-              -> S m -- ^ the current state
-              -> S m -- ^ the new state
+    delta_int :: m -> DeltaInt (S m)
 
     -- | the external transition function
-    delta_ext :: m -- ^ the model 
-              -> S m -- ^ the current state
-              -> T -- ^ the current time
-              -> Set (X m) -- ^ the set of input events at current time
-              -> S m -- ^ the new state
+    delta_ext :: m -> DeltaExt (S m) (X m)
 
     -- | the confluent transition function
-    delta_con :: m -- ^ the model 
-              -> S m -- ^ the current state
-              -> Set (X m) -- ^ the set of input events at current time
-              -> S m -- ^ the new state
+    delta_con :: m -> DeltaCon (S m) (X m)
 
     -- | the output function of the model.
-    lambda :: m -- ^ the model 
-           -> S m -- ^ the current state
-           -> Y m -- ^ the output
+    lambda :: m -> Lambda (S m) (Y m)
 
     -- | the time advance function
-    ta :: m -- ^ the model 
-       -> S m -- ^ the current state
-       -> T -- ^ the time of next internal event
+    ta :: m -> Ta (S m)
 
-    -- | a reference to the model it self as a component of a 'CoupledModel'.
-    selfRef :: m -> ComponentRef
-    selfRef m = MkComponentRef m
 
 
 -- | A 'PDEVS' model which does not have furter 'ComponentRef's
-class (PDEVS m) => AtomicModel m
+class (Model m) => AtomicModel m where
 
 -- | A 'PDEVS' model which is composed out of other 'AtomicModel' or 'CoupledModel'
-class (PDEVS d) => CoupledModel d where
-    -- | the set of 'CoupledModel's components
-    componentRefs ::  d -> Set ComponentRef
-
+class (Model m) => CoupledModel m where
     -- | the map of influencers, for all components in 'componentRefs'
-    compInfluencers :: d -> Map ComponentRef (Set ComponentRef)
+    influencers :: m -> Influencers (X m)
                       
     -- | the influencers of the model it self
-    selfInfluencers :: d -> Set ComponentRef
+    selfInfluencers :: m -> SelfInfluencers (X m) (Y m)
     
-    -- | the map of influencers, for all components in 'componentRefs' and self
-    influencers :: d -> Map ComponentRef (Set ComponentRef)
-    influencers d =
-        let crefs' = compInfluencers d
-            crefs_no_self = case (Map.lookup (selfRef d) crefs') of
-                              Nothing -> crefs'
-                              Just _ -> error $ "compInfluencers of " ++ show d ++ 
-                                       " must not contain a reference to the model it self"
-            x = Set.map f $ componentRefs d
-            f r = isJust $ Map.lookup r $ crefs'
-            y = Set.fold (&&) True x
-            crefs = if (y) then crefs_no_self else 
-                        error $ "compInfluencers of " ++ show d ++ " must contain an entry " ++
-                              "for every Component in componentRefs"
-            allinfs = Map.insert (selfRef d) (selfInfluencers d) crefs
-        in allinfs
-    
--- | a Reference to a 'PDEVS' component hiding its model
-data ComponentRef = forall m . (PDEVS m) => MkComponentRef m
 
--- | a @i@-to-@j@ output translation used for coupleing the components of a 'CoupledModel'.
---
---  [@ExtCoup@] external coupling (translate 'CoupledModel' @i@ input to component @j@ input)
---
---  [@IntCoup@] internal coupling (translate component @i@ output to component @j@ input)
---
---  [@OutCoup@] internal coupling (translate component @i@ output to 'CoupledModel' @j@ output)
-data Z i j where
-    ExtCoup :: ((X i) -> (X j)) 
-            -> Z i j
-    IntCoup :: ((Y i) -> (X j))  
-            -> Z i j
-    OutCoup :: ((Y i) -> (Y j)) 
-            -> Z i j
+data SelfInfluencer x y = forall jx jy . SelfInfluencer 
+     ( ComponentRef jx jy
+     , Either (jy -> y) (jy -> x)
+     )
+type SelfInfluencers x y = Set (SelfInfluencer x y)
 
+data Influencer x = forall ix iy . Influencer
+    ( ComponentRef ix iy
+    , (forall jx jy . Set (ComponentRef jx jy, Either (x -> ix) (jy -> ix)))
+    )
+
+type Influencers x = IntMap (Influencer x)
+
+data ComponentRef x y = forall s . Ref (ProcessorModel s x y)
+
+data ProcessorModel s x y where
+    SimulatorModel :: DeltaInt s 
+                -> DeltaExt s x 
+                -> DeltaCon s x
+                -> Lambda s y 
+                -> Ta s 
+                -> s
+                -> ProcessorModel s x y
+    CoordinatorModel :: Influencers x -> SelfInfluencers x y -> ProcessorModel () x y
 
 
 -- $references
 -- * [PDEVS94] Chow, A.C.; Zeigler, B.P., /Parallel DEVS: a parallel, hierarchical, modular modeling formalism/, Simulation Conference Proceedings, 1994. Winter, pp.716,722, 11-14 Dec. 1994, URL: <http://www.bgc-jena.mpg.de/~twutz/devsbridge/pub/chow96_parallelDEVS.pdf>
 
-
-
-instance Eq (ComponentRef) where
-    (MkComponentRef m1) == (MkComponentRef m2) =
-        case (cast m2) of
-          Nothing -> False
-          Just m2' -> m1 == m2'
-
-instance Ord (ComponentRef) where
-    compare (MkComponentRef m1) (MkComponentRef m2) =
-        case (cast m2) of 
-          Nothing -> compare (show m1) (show m2)
-          Just m2' -> compare m1 m2'
-
-instance Show (ComponentRef) where
-    show (MkComponentRef m) = "MkComponentRef (" ++ show m  ++ ")"
-
-instance Binary T where
-    put = (put :: Time Double -> Put)
-    get = (get :: Get (Time Double))
 
 
 

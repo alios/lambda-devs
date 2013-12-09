@@ -26,42 +26,89 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 -}
 
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module Data.DEVS.Simulation.Simulator
-    ( Simulator, Processor (..)) where
+    where
 
-import Data.Typeable (Typeable, cast)
+import Data.Typeable (Typeable)
 import Control.Distributed.Process
 import qualified Prelude as P
 import Numeric.Units.Dimensional.Prelude
+import qualified Control.Concurrent.MSemN as MSemN
+import Control.Concurrent.MSemN (MSemN)
+import Control.Concurrent.STM.TVar
+import Control.Monad.STM
+import qualified Data.Set as Set
+import Data.Set (Set)
 import Data.DEVS.Simulation.Processor
-import Control.Monad.State
+import Data.DEVS.Devs
+
+data SimState m = SimState {
+      sim_tN :: T,
+      sim_tL :: T,
+      sim_S :: S m,
+      sim_bag :: TVar (Set (X m)),
+      sim_sem_count :: MSemN Int,
+      sim_parent :: SendPort (SimMsg (Set (Y m)))
+    } deriving (Typeable)
+
+initSimState :: (AtomicModel m) => SendPort (SimMsg (Set (Y m))) -> Process (SimState m)
+initSimState parent = do
+  sem_count <- liftIO $ MSemN.new 0
+  bag <- liftIO $ newTVarIO Set.empty
+  return $ SimState { sim_tN = 0 *~ second
+                    , sim_tL = 0 *~ second
+                    , sim_S = s0
+                    , sim_bag = bag
+                    , sim_sem_count = sem_count
+                    , sim_parent = parent
+                    }
 
 
-data Simulator deriving (Typeable)
+simu :: (AtomicModel m) => 
+      ProcessorModel (S m) (X m) (Y m) -> SimState m -> SimMsg (X m) -> 
+      Process (SimState m)
+simu (SimulatorModel 
+     (DeltaInt _delta_int) (DeltaExt _delta_ext) (DeltaCon _delta_con) (Lambda y) (Ta _ta) (_s0))
+     sim (Sync x_count t) = do
+      sem_count <- liftIO $ MSemN.new x_count
 
-instance ProcessorType Simulator
+      s' <- if (t == sim_tN sim) 
+           then do sendChan (sim_parent sim) $ Out (y (sim_S sim)) t
+                   if (x_count == 0) 
+                   then return $ _delta_int $ sim_S sim
+                   else do
+                     waitZero (sim_sem_count sim)
+                     sim_bag' <- liftIO . readTVarIO . sim_bag $ sim
+                     return $ _delta_con (sim_S sim) sim_bag'
+           else do waitZero (sim_sem_count sim)
+                   sim_bag' <- liftIO . readTVarIO . sim_bag $ sim
+                   return $ _delta_ext (sim_S sim) (t - (sim_tL sim)) sim_bag'
+      let tN' = t + _ta (sim_S sim)
+      bagN <- liftIO $ newTVarIO Set.empty
+      sendChan (sim_parent sim) $ Done tN'
+      return sim { sim_tN = tN'
+                 , sim_tL = t
+                 , sim_S = s'
+                 , sim_bag = bagN
+                 }
+simu (SimulatorModel _ _ _ _ _ _) sim (Out y t) = liftIO $ waitOnZero (sim_sem_count sim) $ do
+      atomically $ modifyTVar (sim_bag sim) (Set.insert y)
+      MSemN.signal (sim_sem_count sim) 1
+      return sim
 
-instance Processor Simulator where
-    data ProcessorConf Simulator = SimulatorConf {}
-    data ProcessorState Simulator = 
-        SimulatorState { sim_model :: ProcessorModelT Simulator }
-                       
-    defaultProcessorConf = SimulatorConf
-    mkProcessor conf proc_out_schan (PM m' mconf) = 
-        let m = maybe 
-                (error $ "mkProcessor of Simulator must be called with an AtomicModel.") id
-                (cast  m') 
-        in do
-          proc_say conf $ "creating Simulator for model " ++ show m
-          let s0 = SimulatorState { sim_model = m }
-          put s0
-          (proc_in_schan, proc_in_rchan) <- newChan
-          return proc_in_schan 
-                            
+simu _ _ (Done _) = fail $ "Simulator must not receive a Done Msg"
+
+
+
+--simu' :: (AtomicModel m) => m -> SimState m -> SimMsg (X m) -> Process (SimState m)
+--simu' m = simu (toSimulatorModel m)
+
+
+
+waitZero :: (Integral i) => MSemN i -> Process ()
+waitZero sem = liftIO $ MSemN.wait sem 0
+waitOnZero :: Integral i => MSemN i -> IO a -> IO a
+waitOnZero sem = MSemN.with sem 1
 
